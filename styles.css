@@ -194,13 +194,13 @@
 	font-size: var(--font-ui-small);
 	font-weight: 600;
 	color: var(--text-normal);
-	margin: 0 0 4px 0;
+	margin: 0 0 4px;
 }
 
 .zoxidian-algo-body {
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
-	margin: 0 0 6px 0;
+	margin: 0 0 6px;
 	line-height: 1.5;
 }
 
@@ -226,10 +226,10 @@
 	color: var(--text-normal);
 }
 
-.zoxidian-algo-mult {
+.zoxidian-algo-table td.zoxidian-algo-mult {
 	font-family: var(--font-monospace);
 	font-weight: 600;
-	color: var(--interactive-accent) !important;
+	color: var(--interactive-accent);
 }
 
 /* ---- Max-age inline warning ---- */
