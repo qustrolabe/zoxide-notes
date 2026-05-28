@@ -16,6 +16,12 @@ export default defineConfig([
 	},
 	...obsidianmd.configs.recommended,
 	{
+		files: ["release.mjs"],
+		rules: {
+			"obsidianmd/no-plugin-as-component": "off",
+		},
+	},
+	{
 		files: ["**/*.ts"],
 		languageOptions: {
 			parser: tsparser,

@@ -25,9 +25,9 @@ export function appendFileIcon(parent: HTMLElement): void {
 }
 
 export function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: number | undefined;
 	return function (this: unknown, ...args: Parameters<T>) {
-		clearTimeout(timer);
-		timer = setTimeout(() => fn.apply(this, args), ms);
+		window.clearTimeout(timer);
+		timer = window.setTimeout(() => fn.apply(this, args), ms);
 	} as T;
 }
