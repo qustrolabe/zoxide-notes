@@ -1,5 +1,5 @@
 import { App, PluginSettingTab } from "obsidian";
-import type { Setting, SettingGroup } from "obsidian";
+import type { Setting } from "obsidian";
 import ZoxidianPlugin from "./main";
 import { applyAging } from "./frecency";
 import { appendFileIcon } from "./utils";
@@ -143,12 +143,8 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 					{
 						name: "Preview",
 						desc: "How a note row looks with your current badge settings.",
-						render: (_setting: Setting, group: SettingGroup) => {
-							group.addSetting((setting) => {
-								setting.setName("Example");
-								const row = setting.infoEl.createDiv({ cls: "zoxidian-preview-wrap" });
-								this.renderExampleRow(row);
-							});
+						render: (setting: Setting) => {
+							this.renderExampleRow(setting.infoEl);
 						},
 					},
 				],
@@ -173,12 +169,9 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Usage",
-						render: (_setting: Setting, group: SettingGroup) => {
-							group.addSetting((setting) => {
-								setting.setName("Score pool");
-								this.renderStats(setting.infoEl);
-							});
+						name: "Score pool",
+						render: (setting: Setting) => {
+							this.renderStats(setting.infoEl);
 						},
 					},
 				],
@@ -188,12 +181,9 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 				heading: "How it works",
 				items: [
 					{
-						name: "Algorithm",
-						render: (_setting: Setting, group: SettingGroup) => {
-							group.addSetting((setting) => {
-								setting.setName("Frecency scoring");
-								this.renderAlgoExplainer(setting.infoEl);
-							});
+						name: "Frecency scoring",
+						render: (setting: Setting) => {
+							this.renderAlgoExplainer(setting.infoEl);
 						},
 					},
 				],
@@ -295,10 +285,7 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 			block.createEl("p", { cls: "zoxidian-algo-body", text: body });
 		}
 
-		const tableBlock = root.createDiv({ cls: "zoxidian-algo-step" });
-		tableBlock.createEl("p", { cls: "zoxidian-algo-heading", text: "" });
-
-		const table = tableBlock.createEl("table", { cls: "zoxidian-algo-table" });
+		const table = root.createEl("table", { cls: "zoxidian-algo-table" });
 		const thead = table.createEl("thead");
 		const hrow = thead.createEl("tr");
 		hrow.createEl("th", { text: "Last opened" });
