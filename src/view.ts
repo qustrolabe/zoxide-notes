@@ -56,7 +56,7 @@ export class ZoxidianView extends ItemView {
 		// getLeaf(false) is Obsidian's standard "open in appropriate leaf":
 		// reuses the most recent non-pinned main-area leaf, never touches
 		// sidebar or pinned leaves — same behaviour as the built-in Files panel.
-		void this.app.workspace.getLeaf(false).openFile(file);
+		this.plugin.initiateOpen(file, this.app.workspace.getLeaf(false));
 	}
 
 	redraw(): void {
@@ -129,7 +129,7 @@ export class ZoxidianView extends ItemView {
 						: e.ctrlKey || e.metaKey;
 
 					if (newTab) {
-						void this.app.workspace.getLeaf("tab").openFile(file);
+						this.plugin.initiateOpen(file, this.app.workspace.getLeaf("tab"));
 					} else {
 						this.openOrReveal(file);
 					}
@@ -144,25 +144,27 @@ export class ZoxidianView extends ItemView {
 						item
 							.setTitle("Open")
 							.setIcon("arrow-right-circle")
-							.onClick(() => this.openOrReveal(file))
+							.onClick(() => {
+								this.plugin.initiateOpen(file, this.app.workspace.getLeaf(false));
+							})
 					);
 
 					menu.addItem((item) =>
 						item
 							.setTitle("Open in new tab")
 							.setIcon("file-plus")
-							.onClick(() =>
-								void this.app.workspace.getLeaf("tab").openFile(file)
-							)
+							.onClick(() => {
+								this.plugin.initiateOpen(file, this.app.workspace.getLeaf("tab"));
+							})
 					);
 
 					menu.addItem((item) =>
 						item
 							.setTitle("Open to the right")
 							.setIcon("separator-vertical")
-							.onClick(() =>
-								void this.app.workspace.getLeaf("split").openFile(file)
-							)
+							.onClick(() => {
+								this.plugin.initiateOpen(file, this.app.workspace.getLeaf("split"));
+							})
 					);
 
 					menu.addSeparator();

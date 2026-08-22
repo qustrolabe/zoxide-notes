@@ -109,7 +109,9 @@ export class ZoxidianSearchModal extends SuggestModal<SortedEntry> {
 			return;
 		}
 
-		void this.pickLeaf(evt).openFile(file);
+		// initiateOpen guarantees exactly one score increment, even when the
+		// workspace "file-open" event doesn't fire (e.g. empty workspace).
+		this.plugin.initiateOpen(file, this.pickLeaf(evt));
 	}
 
 	private createNote(): void {
@@ -124,7 +126,7 @@ export class ZoxidianSearchModal extends SuggestModal<SortedEntry> {
 			const leaf = (mostRecent && mostRecent.getRoot() === this.app.workspace.rootSplit)
 				? mostRecent
 				: this.app.workspace.getLeaf("tab");
-			void leaf.openFile(file);
+			this.plugin.initiateOpen(file, leaf);
 		};
 
 		const existing = this.app.vault.getAbstractFileByPath(path);
@@ -228,7 +230,7 @@ export class ZoxidianSearchModal extends SuggestModal<SortedEntry> {
 		const leaf = this.pickLeaf(evt);
 		void this.app.vault
 			.create(path, "")
-			.then(file => void leaf.openFile(file))
+			.then(file => this.plugin.initiateOpen(file, leaf))
 			.catch(() => new Notice(`Could not create "${path}".`));
 	}
 }

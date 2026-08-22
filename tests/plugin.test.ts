@@ -4,6 +4,7 @@ import "./obsidian-mock";
 // Dynamic imports so the mock is registered before any module loads.
 const { default: ZoxidianPlugin } = await import("../src/main");
 const { DEFAULT_SETTINGS } = await import("../src/settings");
+const { TFile } = await import("obsidian");
 
 // ---------------------------------------------------------------------------
 // Test-instance factory
@@ -24,6 +25,11 @@ function makePlugin() {
 	plugin.notifyRenameInViews = mock(() => {});
 	plugin.settings       = { ...DEFAULT_SETTINGS };
 	return plugin;
+}
+
+function makeFile(path: string) {
+	// Mock TFile takes a path; real typings declare no constructor args.
+	return new (TFile as any)(path) as any;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +81,92 @@ describe("recordVisit", () => {
 
 		expect(plugin.files["a.md"]?.score).toBe(3);
 		expect(plugin.debouncedPersist).toHaveBeenCalledTimes(1);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// handleFileOpen (fresh open vs. tab switch)
+// ---------------------------------------------------------------------------
+
+describe("handleFileOpen", () => {
+	it("counts a fresh new-tab open even when the snapshot was rebuilt mid-open", () => {
+		const plugin = makePlugin();
+		plugin.rebuildOpenPathCounts = mock(() => {});
+		plugin.settings.recordOnEveryVisit = false;
+
+		// User initiates the open while the file has no leaf…
+		plugin.pendingOpens.set("a.md", false);
+		// …then opening into a new leaf fires layout-change, which rebuilds
+		// the snapshot and now counts the file as "already open".
+		plugin.openPathCounts.set("a.md", 1);
+
+		plugin.handleFileOpen(makeFile("a.md"));
+
+		expect(plugin.files["a.md"]?.score).toBe(1);
+	});
+
+	it("still skips a genuine tab switch with no pending marker", () => {
+		const plugin = makePlugin();
+		plugin.rebuildOpenPathCounts = mock(() => {});
+		plugin.settings.recordOnEveryVisit = false;
+		plugin.files["a.md"] = { score: 2, lastAccess: 1000 };
+		plugin.openPathCounts.set("a.md", 1);
+
+		plugin.handleFileOpen(makeFile("a.md"));
+
+		expect(plugin.files["a.md"]?.score).toBe(2);
+	});
+
+	it("consumes the pending marker so a later tab switch is skipped again", () => {
+		const plugin = makePlugin();
+		plugin.rebuildOpenPathCounts = mock(() => {});
+		plugin.settings.recordOnEveryVisit = false;
+
+		plugin.pendingOpens.set("a.md", false);   // captures "not open" (count 0)
+		plugin.openPathCounts.set("a.md", 1);
+		plugin.handleFileOpen(makeFile("a.md"));  // fresh open → counts
+
+		plugin.handleFileOpen(makeFile("a.md"));  // no marker left → skip
+
+		expect(plugin.files["a.md"]?.score).toBe(1);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// initiateOpen (scores even when the file-open event never fires)
+// ---------------------------------------------------------------------------
+
+describe("initiateOpen", () => {
+	function sleep(ms: number) {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+
+	it("records the visit itself when file-open never fires (empty workspace)", async () => {
+		const plugin = makePlugin();
+		plugin.rebuildOpenPathCounts = mock(() => {});
+		const leaf = { openFile: mock(async () => {}) };
+
+		plugin.initiateOpen(makeFile("fresh.md"), leaf as any);
+
+		expect(plugin.files["fresh.md"]).toBeUndefined(); // not recorded synchronously
+		await sleep(80);
+		expect(plugin.files["fresh.md"]?.score).toBe(1);
+	});
+
+	it("does not double-count when the file-open event does fire", async () => {
+		const plugin = makePlugin();
+		plugin.rebuildOpenPathCounts = mock(() => {});
+		const leaf = {
+			openFile: mock(() => {
+				plugin.handleFileOpen(makeFile("fresh.md"));
+				return Promise.resolve();
+			}),
+		};
+
+		plugin.initiateOpen(makeFile("fresh.md"), leaf as any);
+
+		await sleep(80);
+		expect(plugin.files["fresh.md"]?.score).toBe(1);
 	});
 });
 

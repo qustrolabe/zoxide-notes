@@ -1,4 +1,4 @@
-import { FileView, Plugin, TFile } from "obsidian";
+import { FileView, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, ZoxidianSettingTab, ZoxidianSettings } from "./settings";
 import { ZoxidianSearchModal } from "./modal";
 import { VIEW_TYPE_ZOXIDIAN, FileEntry } from "./types";
@@ -22,6 +22,13 @@ export default class ZoxidianPlugin extends Plugin {
 	// Snapshot of open-path counts from the previous workspace state. This is
 	// used to decide whether a file-open is a fresh open or a tab switch.
 	private openPathCounts = new Map<string, number>();
+	// Paths about to be opened by our own UI surfaces, mapped to whether the
+	// file already had an open leaf BEFORE the open was initiated. Needed
+	// because opening into a brand-new leaf (e.g. Ctrl+Click → getLeaf("tab"))
+	// fires layout-change before file-open, which rebuilds the snapshot while
+	// the new leaf already shows the target file — making a fresh open look
+	// like a tab switch and wrongly skipping the score increment.
+	private pendingOpens = new Map<string, boolean>();
 
 	// -------------------------------------------------------------------------
 	// Lifecycle
@@ -61,10 +68,7 @@ export default class ZoxidianPlugin extends Plugin {
 
 		this.registerEvent(
 			this.app.workspace.on("file-open", (file) => {
-				if (!(file instanceof TFile)) return;
-				const wasAlreadyOpen = (this.openPathCounts.get(file.path) ?? 0) > 0;
-				this.rebuildOpenPathCounts();
-				this.recordVisit(file, wasAlreadyOpen);
+				if (file) this.handleFileOpen(file);
 			})
 		);
 
@@ -90,6 +94,38 @@ export default class ZoxidianPlugin extends Plugin {
 	}
 
 	onunload() { /* Obsidian cleans up registered events */ }
+
+	// Opens a file from one of our UI surfaces and guarantees the visit is
+	// scored exactly once:
+	// - If the workspace "file-open" event fires, handleFileOpen() consumes
+	//   the marker and records the visit.
+	// - If it never fires (e.g. very first open into an empty workspace /
+	//   zero tabs), the timeout below records it instead.
+	initiateOpen(file: TFile, leaf: WorkspaceLeaf): void {
+		const wasAlreadyOpen = (this.openPathCounts.get(file.path) ?? 0) > 0;
+		this.pendingOpens.set(file.path, wasAlreadyOpen);
+		void leaf.openFile(file);
+		setTimeout(() => {
+			const pending = this.pendingOpens.get(file.path);
+			if (pending === undefined) return; // already handled by file-open
+			this.pendingOpens.delete(file.path);
+			this.recordVisit(file, pending);
+		}, 50);
+	}
+
+	// Workspace "file-open" handler. Freshness (fresh open vs. tab switch) is
+	// decided from the state captured in initiateOpen() when available:
+	// opening into a brand-new leaf fires layout-change before this event,
+	// which rebuilds the snapshot while the new leaf already shows the file —
+	// the snapshot alone would misclassify every fresh new-tab open.
+	handleFileOpen(file: TFile): void {
+		if (!(file instanceof TFile)) return;
+		const pending = this.pendingOpens.get(file.path);
+		this.pendingOpens.delete(file.path);
+		const wasAlreadyOpen = pending ?? (this.openPathCounts.get(file.path) ?? 0) > 0;
+		this.rebuildOpenPathCounts();
+		this.recordVisit(file, wasAlreadyOpen);
+	}
 
 	private rebuildOpenPathCounts(): void {
 		const next = new Map<string, number>();
