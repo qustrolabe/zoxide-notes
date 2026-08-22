@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab } from "obsidian";
+import type { Setting, SettingGroup } from "obsidian";
 import ZoxidianPlugin from "./main";
 import { applyAging } from "./frecency";
 import { appendFileIcon } from "./utils";
@@ -33,283 +34,240 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	// Controls bind to this.plugin.settings[key], but persistence must go
+	// through the plugin's combined { files, settings } blob — the default
+	// setControlValue would saveData(settings) alone and drop tracked files.
+	getControlValue(key: string): unknown {
+		return this.plugin.settings[key as keyof ZoxidianSettings];
+	}
 
-		// updatePreview is declared early so toggle onChange handlers can reference it
-		// via closure. It will be assigned later in this method. Since onChange only
-		// fires on user interaction (after display() has returned), the assignment
-		// is always in place before it's ever called.
-		let updatePreview: () => void = () => {};
+	setControlValue(key: string, value: unknown): void {
+		const s = this.plugin.settings as unknown as Record<string, unknown>;
+		s[key] = value;
 
-		containerEl.createEl("p", {
-			cls: "zoxidian-settings-desc",
-			text: "Tracks note visits using the zoxide frecency algorithm. Each visit increments the base score; the displayed frecency score is weighted by recency.",
-		});
+		switch (key) {
+			case "maxItems":
+			case "excludePaths":
+			case "showFrecencyBadge":
+			case "showScoreBadge":
+				this.plugin.redrawViews();
+				break;
+			case "maxAge":
+				if (typeof value === "number" && value > 0) {
+					applyAging(this.plugin.files, value);
+				}
+				this.plugin.redrawViews();
+				break;
+		}
 
-		new Setting(containerEl)
-			.setName("Max items")
-			.setDesc("Maximum number of notes to show in the panel.")
-			.addText((text) =>
-				text
-					.setPlaceholder("50")
-					.setValue(String(this.plugin.settings.maxItems))
-					.onChange(async (value) => {
-						const num = parseInt(value, 10);
-						if (!isNaN(num) && num > 0) {
-							this.plugin.settings.maxItems = num;
-							await this.plugin.persistData();
-							this.plugin.redrawViews();
-						}
-					})
-			);
+		void this.plugin.persistData();
+		// Re-render render()-driven rows (preview, stats) that depend on the
+		// value just changed.
+		this.update();
+	}
 
-		new Setting(containerEl)
-			.setName("Exclude paths (regex)")
-			.setDesc(
-				"Notes whose path matches this regex are excluded. Example: ^daily/"
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("^daily/")
-					.setValue(this.plugin.settings.excludePaths)
-					.onChange(async (value) => {
-						this.plugin.settings.excludePaths = value;
-						await this.plugin.persistData();
-						this.plugin.redrawViews();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Open in new tab by default")
-			.setDesc(
-				"When enabled, clicking a note opens it in a new tab. You can always Ctrl/Cmd+click to toggle."
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.openInNewTab)
-					.onChange(async (value) => {
-						this.plugin.settings.openInNewTab = value;
-						await this.plugin.persistData();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Record score on every visit")
-			.setDesc(
-				"Off (default): score increments only when you open a note that has no existing tab. " +
-				"Switching focus to an already-open tab does not count, but closing and reopening does. " +
-				"On: score increments every time the note becomes active, including tab switches."
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.recordOnEveryVisit)
-					.onChange(async (value) => {
-						this.plugin.settings.recordOnEveryVisit = value;
-						await this.plugin.persistData();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Include untracked files in search modal")
-			.setDesc(
-				"When enabled, the search modal lists all vault notes after tracked ones. " +
-				"Tracked notes (sorted by frecency) always appear first."
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.includeUntrackedInModal)
-					.onChange(async (value) => {
-						this.plugin.settings.includeUntrackedInModal = value;
-						await this.plugin.persistData();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Show frecency badge")
-			.setDesc("Display the frecency score badge (accent colour) next to each note.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showFrecencyBadge)
-					.onChange(async (value) => {
-						this.plugin.settings.showFrecencyBadge = value;
-						await this.plugin.persistData();
-						this.plugin.redrawViews();
-						updatePreview();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Show score badge")
-			.setDesc("Display the score badge (muted) next to each note.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showScoreBadge)
-					.onChange(async (value) => {
-						this.plugin.settings.showScoreBadge = value;
-						await this.plugin.persistData();
-						this.plugin.redrawViews();
-						updatePreview();
-					})
-			);
-
-		// ---- Live preview ----
-
-		new Setting(containerEl).setName("Preview").setHeading();
-		containerEl.createEl("p", {
-			cls: "zoxidian-settings-desc",
-			text: "How a note row looks with your current badge settings.",
-		});
-
-		const previewWrap = containerEl.createDiv({ cls: "zoxidian-preview-wrap" });
-
-		updatePreview = () => {
-			previewWrap.empty();
-
-			const row = previewWrap.createDiv({ cls: "zoxidian-item" });
-
-			const iconWrap = row.createSpan({ cls: "zoxidian-item-icon" });
-			appendFileIcon(iconWrap);
-
-			row.createSpan({
-				cls: "zoxidian-item-name",
-				text: "Example note",
-			});
-
-			const badges = row.createSpan({ cls: "zoxidian-badges" });
-
-			if (this.plugin.settings.showFrecencyBadge) {
-				badges.createSpan({
-					cls: "zoxidian-badge zoxidian-badge-frecency",
-					text: "8.0",
-				});
-			}
-
-			if (this.plugin.settings.showScoreBadge) {
-				badges.createSpan({
-					cls: "zoxidian-badge zoxidian-badge-base",
-					text: "4",
-				});
-			}
-		};
-
-		updatePreview();
-
-		// ---- Aging ----
-
-		new Setting(containerEl).setName("Aging").setHeading();
-
-		let updateStats: () => void = () => {};
-
-		let pendingMaxAge: number | null = null;
-		let applyBtnEl: HTMLButtonElement | null = null;
-		let showWarning: (num: number, total: number) => void = () => {};
-		let hideWarning: () => void = () => {};
-
-		new Setting(containerEl)
-			.setName("Max age")
-			.setDesc(
-				"Maximum total score across all notes (zoxide default: 9000). " +
-				"When the sum of all base scores exceeds this, every score is scaled " +
-				"down proportionally and notes that fall below 1 are pruned."
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("9000")
-					.setValue(String(this.plugin.settings.maxAge))
-					.onChange(async (value) => {
-						const num = parseInt(value, 10);
-						if (!isNaN(num) && num > 0) {
-							const total = this.plugin.getTotalScore();
-							if (num < total) {
-								pendingMaxAge = num;
-								showWarning(num, total);
-							} else {
-								pendingMaxAge = null;
-								hideWarning();
-								this.plugin.settings.maxAge = num;
-								applyAging(this.plugin.files, num);
-								await this.plugin.persistData();
-								this.plugin.redrawViews();
-								updateStats();
-							}
-						} else {
-							pendingMaxAge = null;
-							hideWarning();
-						}
-					})
-			)
-			.addButton((btn) => {
-				btn.setButtonText("Apply").setWarning();
-				applyBtnEl = btn.buttonEl;
-				applyBtnEl.addClass("zoxidian-hidden");
-				btn.onClick(async () => {
-					if (pendingMaxAge === null) return;
-					this.plugin.settings.maxAge = pendingMaxAge;
-					applyAging(this.plugin.files, pendingMaxAge);
-					await this.plugin.persistData();
+	getSettingDefinitions() {
+		return [
+			{
+				name: "About",
+				desc: "Tracks note visits using the zoxide frecency algorithm. Each visit increments the base score; the displayed frecency score is weighted by recency.",
+			},
+			{
+				type: "group" as const,
+				heading: "General",
+				items: [
+					{
+						name: "Max items",
+						desc: "Maximum number of notes to show in the panel.",
+						control: {
+							type: "number" as const,
+							key: "maxItems",
+							placeholder: "50",
+							min: 1,
+							step: 1,
+							validate: (v: number) =>
+								Number.isInteger(v) && v >= 1 ? undefined : "Enter a whole number of 1 or more.",
+						},
+					},
+					{
+						name: "Exclude paths (regex)",
+						desc: "Notes whose path matches this regex are excluded. Example: ^daily/",
+						control: {
+							type: "text" as const,
+							key: "excludePaths",
+							placeholder: "^daily/",
+							validate: (v: string) => {
+								try {
+									new RegExp(v);
+									return undefined;
+								} catch {
+									return "Invalid regular expression.";
+								}
+							},
+						},
+					},
+					{
+						name: "Open in new tab by default",
+						desc: "When enabled, clicking a note opens it in a new tab. You can always Ctrl/Cmd+click to toggle.",
+						control: { type: "toggle" as const, key: "openInNewTab" },
+					},
+					{
+						name: "Record score on every visit",
+						desc: "Off (default): score increments only when you open a note that has no existing tab. " +
+							"Switching focus to an already-open tab does not count, but closing and reopening does. " +
+							"On: score increments every time the note becomes active, including tab switches.",
+						control: { type: "toggle" as const, key: "recordOnEveryVisit" },
+					},
+					{
+						name: "Include untracked files in search modal",
+						desc: "When enabled, the search modal lists all vault notes after tracked ones. " +
+							"Tracked notes (sorted by frecency) always appear first.",
+						control: { type: "toggle" as const, key: "includeUntrackedInModal" },
+					},
+				],
+			},
+			{
+				type: "group" as const,
+				heading: "Display",
+				items: [
+					{
+						name: "Show frecency badge",
+						desc: "Display the frecency score badge (accent colour) next to each note.",
+						control: { type: "toggle" as const, key: "showFrecencyBadge" },
+					},
+					{
+						name: "Show score badge",
+						desc: "Display the score badge (muted) next to each note.",
+						control: { type: "toggle" as const, key: "showScoreBadge" },
+					},
+					{
+						name: "Preview",
+						desc: "How a note row looks with your current badge settings.",
+						render: (_setting: Setting, group: SettingGroup) => {
+							group.addSetting((setting) => {
+								setting.setName("Example");
+								const row = setting.infoEl.createDiv({ cls: "zoxidian-preview-wrap" });
+								this.renderExampleRow(row);
+							});
+						},
+					},
+				],
+			},
+			{
+				type: "group" as const,
+				heading: "Aging",
+				items: [
+					{
+						name: "Max age",
+						desc: "Maximum total score across all notes (zoxide default: 9000). " +
+							"When the sum of all base scores exceeds this, every score is scaled down proportionally " +
+							"and notes that fall below 1 are pruned immediately.",
+						control: {
+							type: "number" as const,
+							key: "maxAge",
+							placeholder: "9000",
+							min: 1,
+							step: 1,
+							validate: (v: number) =>
+								Number.isInteger(v) && v >= 1 ? undefined : "Enter a whole number of 1 or more.",
+						},
+					},
+					{
+						name: "Usage",
+						render: (_setting: Setting, group: SettingGroup) => {
+							group.addSetting((setting) => {
+								setting.setName("Score pool");
+								this.renderStats(setting.infoEl);
+							});
+						},
+					},
+				],
+			},
+			{
+				type: "group" as const,
+				heading: "How it works",
+				items: [
+					{
+						name: "Algorithm",
+						render: (_setting: Setting, group: SettingGroup) => {
+							group.addSetting((setting) => {
+								setting.setName("Frecency scoring");
+								this.renderAlgoExplainer(setting.infoEl);
+							});
+						},
+					},
+				],
+			},
+			{
+				name: "Clear all data",
+				desc: "Remove all tracked visit data. This cannot be undone.",
+				action: () => {
+					this.plugin.clearData();
 					this.plugin.redrawViews();
-					updateStats();
-					pendingMaxAge = null;
-					hideWarning();
-				});
+					this.update();
+				},
+			},
+		];
+	}
+
+	private renderExampleRow(root: HTMLElement): void {
+		root.empty();
+
+		const row = root.createDiv({ cls: "zoxidian-item" });
+
+		row.createSpan({ cls: "zoxidian-item-icon" }, (span) => appendFileIcon(span));
+
+		row.createSpan({
+			cls: "zoxidian-item-name",
+			text: "Example note",
+		});
+
+		const badges = row.createDiv({ cls: "zoxidian-badges" });
+
+		if (this.plugin.settings.showFrecencyBadge) {
+			badges.createSpan({
+				cls: "zoxidian-badge zoxidian-badge-frecency",
+				text: "8.0",
 			});
+		}
 
-		const maxAgeWarningEl = containerEl.createEl("p", { cls: "zoxidian-maxage-warning" });
-		maxAgeWarningEl.addClass("zoxidian-hidden");
+		if (this.plugin.settings.showScoreBadge) {
+			badges.createSpan({
+				cls: "zoxidian-badge zoxidian-badge-base",
+				text: "4",
+			});
+		}
+	}
 
-			showWarning = (num: number, total: number) => {
-				const scale = (num * 0.9) / total;
-				const pruneCount = Object.values(this.plugin.files)
-					.filter(e => e.score * scale < 1).length;
-			maxAgeWarningEl.setText(
-				`Reducing to ${num} will prune ${pruneCount} note(s) ` +
-				`(current total: ${total.toFixed(1)}).`
-			);
-			maxAgeWarningEl.removeClass("zoxidian-hidden");
-			if (applyBtnEl) applyBtnEl.removeClass("zoxidian-hidden");
+	private renderStats(root: HTMLElement): void {
+		root.empty();
+		root.addClass("zoxidian-stats");
+
+		const total = this.plugin.getTotalScore();
+		const count = Object.keys(this.plugin.files).length;
+		const pct = Math.min(100, (total / this.plugin.settings.maxAge) * 100);
+
+		const grid = root.createDiv({ cls: "zoxidian-stats-grid" });
+
+		const addStat = (label: string, value: string) => {
+			const cell = grid.createDiv({ cls: "zoxidian-stat" });
+			cell.createSpan({ cls: "zoxidian-stat-value", text: value });
+			cell.createSpan({ cls: "zoxidian-stat-label", text: label });
 		};
 
-		hideWarning = () => {
-			maxAgeWarningEl.addClass("zoxidian-hidden");
-			if (applyBtnEl) applyBtnEl.addClass("zoxidian-hidden");
-		};
+		addStat("Tracked notes", String(count));
+		addStat("Total score", `${total.toFixed(1)} / ${this.plugin.settings.maxAge}`);
+		addStat("Age pool used", `${pct.toFixed(1)}%`);
 
-		// Stats
-		const statsEl = containerEl.createDiv({ cls: "zoxidian-stats" });
+		// Progress bar
+		const barWrap = root.createDiv({ cls: "zoxidian-age-bar-wrap" });
+		const bar = barWrap.createDiv({ cls: "zoxidian-age-bar" });
+		bar.setCssProps({ "--zoxidian-age-pct": `${pct}%` });
+	}
 
-		updateStats = () => {
-			statsEl.empty();
-			const total = this.plugin.getTotalScore();
-			const count = Object.keys(this.plugin.files).length;
-			const pct   = Math.min(100, (total / this.plugin.settings.maxAge) * 100);
-
-			const grid = statsEl.createDiv({ cls: "zoxidian-stats-grid" });
-
-			const addStat = (label: string, value: string) => {
-				const cell = grid.createDiv({ cls: "zoxidian-stat" });
-				cell.createSpan({ cls: "zoxidian-stat-value", text: value });
-				cell.createSpan({ cls: "zoxidian-stat-label", text: label });
-			};
-
-			addStat("Tracked notes", String(count));
-			addStat("Total score", `${total.toFixed(1)} / ${this.plugin.settings.maxAge}`);
-			addStat("Age pool used", `${pct.toFixed(1)}%`);
-
-			// Progress bar
-			const barWrap = statsEl.createDiv({ cls: "zoxidian-age-bar-wrap" });
-			const bar = barWrap.createDiv({ cls: "zoxidian-age-bar" });
-			bar.setCssProps({ "--zoxidian-age-pct": `${pct}%` });
-		};
-
-		updateStats();
-
-		// ---- Algorithm ----
-
-		new Setting(containerEl).setName("How it works").setHeading();
-
-		const algoEl = containerEl.createDiv({ cls: "zoxidian-algo" });
+	private renderAlgoExplainer(root: HTMLElement): void {
+		root.empty();
+		root.addClass("zoxidian-algo");
 
 		const steps: Array<[string, string]> = [
 			[
@@ -332,24 +290,25 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 		];
 
 		for (const [heading, body] of steps) {
-			const block = algoEl.createDiv({ cls: "zoxidian-algo-step" });
+			const block = root.createDiv({ cls: "zoxidian-algo-step" });
 			block.createEl("p", { cls: "zoxidian-algo-heading", text: heading });
-			block.createEl("p", { cls: "zoxidian-algo-body",    text: body });
+			block.createEl("p", { cls: "zoxidian-algo-body", text: body });
 		}
 
-		// Frecency table (inline in step 2's block)
-		const tableBlock = algoEl.children[1] as HTMLElement;
+		const tableBlock = root.createDiv({ cls: "zoxidian-algo-step" });
+		tableBlock.createEl("p", { cls: "zoxidian-algo-heading", text: "" });
+
 		const table = tableBlock.createEl("table", { cls: "zoxidian-algo-table" });
 		const thead = table.createEl("thead");
-		const hrow  = thead.createEl("tr");
+		const hrow = thead.createEl("tr");
 		hrow.createEl("th", { text: "Last opened" });
 		hrow.createEl("th", { text: "Multiplier" });
 
 		const rows: Array<[string, string]> = [
 			["Within the last hour", "× 4"],
-			["Within the last day",  "× 2"],
+			["Within the last day", "× 2"],
 			["Within the last week", "÷ 2"],
-			["Longer ago",           "÷ 4"],
+			["Longer ago", "÷ 4"],
 		];
 		const tbody = table.createEl("tbody");
 		for (const [when, mult] of rows) {
@@ -357,23 +316,5 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 			tr.createEl("td", { text: when });
 			tr.createEl("td", { cls: "zoxidian-algo-mult", text: mult });
 		}
-
-		// ---- Data management ----
-
-		new Setting(containerEl).setName("Data management").setHeading();
-
-		new Setting(containerEl)
-			.setName("Clear all data")
-			.setDesc("Remove all tracked visit data. This cannot be undone.")
-			.addButton((btn) =>
-				btn
-					.setButtonText("Clear")
-					.setWarning()
-					.onClick(() => {
-						this.plugin.clearData();
-						this.plugin.redrawViews();
-						updateStats();
-					})
-			);
 	}
 }

@@ -26,6 +26,6 @@
 		"typescript": "^6.0.3"
 	},
 	"dependencies": {
-		"obsidian": "^1.12.3"
+		"obsidian": "^1.13.1"
 	}
 }

@@ -2,7 +2,7 @@
 	"id": "zoxide-notes",
 	"name": "Zoxide Notes",
 	"version": "1.4.3",
-	"minAppVersion": "1.12.4",
+	"minAppVersion": "1.13.0",
 	"description": "Track and list visited notes with zoxide frecency scoring algorithm.",
 	"author": "qustrolabe",
 	"authorUrl": "https://github.com/qustrolabe",
