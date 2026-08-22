@@ -162,32 +162,32 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 			text: "How a note row looks with your current badge settings.",
 		});
 
-		const previewWrap = containerEl.createEl("div", { cls: "zoxidian-preview-wrap" });
+		const previewWrap = containerEl.createDiv({ cls: "zoxidian-preview-wrap" });
 
 		updatePreview = () => {
 			previewWrap.empty();
 
-			const row = previewWrap.createEl("div", { cls: "zoxidian-item" });
+			const row = previewWrap.createDiv({ cls: "zoxidian-item" });
 
-			const iconWrap = row.createEl("span", { cls: "zoxidian-item-icon" });
+			const iconWrap = row.createSpan({ cls: "zoxidian-item-icon" });
 			appendFileIcon(iconWrap);
 
-			row.createEl("span", {
+			row.createSpan({
 				cls: "zoxidian-item-name",
 				text: "Example note",
 			});
 
-			const badges = row.createEl("span", { cls: "zoxidian-badges" });
+			const badges = row.createSpan({ cls: "zoxidian-badges" });
 
 			if (this.plugin.settings.showFrecencyBadge) {
-				badges.createEl("span", {
+				badges.createSpan({
 					cls: "zoxidian-badge zoxidian-badge-frecency",
 					text: "8.0",
 				});
 			}
 
 			if (this.plugin.settings.showScoreBadge) {
-				badges.createEl("span", {
+				badges.createSpan({
 					cls: "zoxidian-badge zoxidian-badge-base",
 					text: "4",
 				});
@@ -277,7 +277,7 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 		};
 
 		// Stats
-		const statsEl = containerEl.createEl("div", { cls: "zoxidian-stats" });
+		const statsEl = containerEl.createDiv({ cls: "zoxidian-stats" });
 
 		updateStats = () => {
 			statsEl.empty();
@@ -285,12 +285,12 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 			const count = Object.keys(this.plugin.files).length;
 			const pct   = Math.min(100, (total / this.plugin.settings.maxAge) * 100);
 
-			const grid = statsEl.createEl("div", { cls: "zoxidian-stats-grid" });
+			const grid = statsEl.createDiv({ cls: "zoxidian-stats-grid" });
 
 			const addStat = (label: string, value: string) => {
-				const cell = grid.createEl("div", { cls: "zoxidian-stat" });
-				cell.createEl("span", { cls: "zoxidian-stat-value", text: value });
-				cell.createEl("span", { cls: "zoxidian-stat-label", text: label });
+				const cell = grid.createDiv({ cls: "zoxidian-stat" });
+				cell.createSpan({ cls: "zoxidian-stat-value", text: value });
+				cell.createSpan({ cls: "zoxidian-stat-label", text: label });
 			};
 
 			addStat("Tracked notes", String(count));
@@ -298,8 +298,8 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 			addStat("Age pool used", `${pct.toFixed(1)}%`);
 
 			// Progress bar
-			const barWrap = statsEl.createEl("div", { cls: "zoxidian-age-bar-wrap" });
-			const bar = barWrap.createEl("div", { cls: "zoxidian-age-bar" });
+			const barWrap = statsEl.createDiv({ cls: "zoxidian-age-bar-wrap" });
+			const bar = barWrap.createDiv({ cls: "zoxidian-age-bar" });
 			bar.setCssProps({ "--zoxidian-age-pct": `${pct}%` });
 		};
 
@@ -309,7 +309,7 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("How it works").setHeading();
 
-		const algoEl = containerEl.createEl("div", { cls: "zoxidian-algo" });
+		const algoEl = containerEl.createDiv({ cls: "zoxidian-algo" });
 
 		const steps: Array<[string, string]> = [
 			[
@@ -332,7 +332,7 @@ export class ZoxidianSettingTab extends PluginSettingTab {
 		];
 
 		for (const [heading, body] of steps) {
-			const block = algoEl.createEl("div", { cls: "zoxidian-algo-step" });
+			const block = algoEl.createDiv({ cls: "zoxidian-algo-step" });
 			block.createEl("p", { cls: "zoxidian-algo-heading", text: heading });
 			block.createEl("p", { cls: "zoxidian-algo-body",    text: body });
 		}

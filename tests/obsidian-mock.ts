@@ -1,5 +1,9 @@
 import { mock } from "bun:test";
 
+// Plugin code uses window.* timers (obsidianmd lint rule); provide a window
+// alias so tests running under Bun (which has none) behave like Obsidian.
+(globalThis as any).window = globalThis;
+
 // Single shared Obsidian mock to avoid order-dependent test failures.
 void mock.module("obsidian", () => ({
 	App: class {},

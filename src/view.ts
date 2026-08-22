@@ -74,33 +74,33 @@ export class ZoxidianView extends ItemView {
 			return;
 		}
 
-		const listEl = container.createEl("div", { cls: "zoxidian-list" });
+		const listEl = container.createDiv({ cls: "zoxidian-list" });
 		for (const { path, entry, frecency } of entries) {
 			try {
 				const file = this.app.vault.getAbstractFileByPath(path);
 				if (!(file instanceof TFile)) continue;
 
-				const row = listEl.createEl("div", { cls: "zoxidian-item" });
+				const row = listEl.createDiv({ cls: "zoxidian-item" });
 
 				if (path === this.activeFilePath) {
 					row.addClass("is-active");
 				}
 
 				// File icon
-				const iconWrap = row.createEl("span", { cls: "zoxidian-item-icon" });
+				const iconWrap = row.createSpan({ cls: "zoxidian-item-icon" });
 				appendFileIcon(iconWrap);
 
 				// Note name
-				row.createEl("span", {
+				row.createSpan({
 					cls: "zoxidian-item-name",
 					text: file.basename,
 				});
 
 				// Score badges — conditionally rendered based on settings
-				const badgeWrap = row.createEl("span", { cls: "zoxidian-badges" });
+				const badgeWrap = row.createSpan({ cls: "zoxidian-badges" });
 
 				if (this.plugin.settings.showFrecencyBadge) {
-					const frecBadge = badgeWrap.createEl("span", {
+					const frecBadge = badgeWrap.createSpan({
 						cls: "zoxidian-badge zoxidian-badge-frecency",
 						text: formatScore(frecency),
 					});
@@ -108,7 +108,7 @@ export class ZoxidianView extends ItemView {
 				}
 
 				if (this.plugin.settings.showScoreBadge) {
-					const baseBadge = badgeWrap.createEl("span", {
+					const baseBadge = badgeWrap.createSpan({
 						cls: "zoxidian-badge zoxidian-badge-base",
 						text: formatScore(entry.score),
 					});
@@ -196,8 +196,8 @@ export class ZoxidianView extends ItemView {
 
 			} catch (err) {
 				console.error(`[Zoxidian] Failed to render row for "${path}":`, err);
-				const errRow = listEl.createEl("div", { cls: "zoxidian-item zoxidian-item-error" });
-				errRow.createEl("span", { cls: "zoxidian-item-name", text: `⚠ ${path}` });
+				const errRow = listEl.createDiv({ cls: "zoxidian-item zoxidian-item-error" });
+				errRow.createSpan({ cls: "zoxidian-item-name", text: `⚠ ${path}` });
 			}
 		}
 	}

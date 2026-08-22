@@ -105,7 +105,8 @@ export default class ZoxidianPlugin extends Plugin {
 		const wasAlreadyOpen = (this.openPathCounts.get(file.path) ?? 0) > 0;
 		this.pendingOpens.set(file.path, wasAlreadyOpen);
 		void leaf.openFile(file);
-		setTimeout(() => {
+		// window.setTimeout for popout-window compatibility (see obsidianmd lint rule).
+		window.setTimeout(() => {
 			const pending = this.pendingOpens.get(file.path);
 			if (pending === undefined) return; // already handled by file-open
 			this.pendingOpens.delete(file.path);

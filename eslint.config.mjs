@@ -19,6 +19,9 @@ export default defineConfig([
 		files: ["release.mjs"],
 		rules: {
 			"obsidianmd/no-plugin-as-component": "off",
+			// Dev-side release script — Node APIs and console output are fine here.
+			"obsidianmd/no-nodejs-modules": "off",
+			"obsidianmd/rule-custom-message": "off",
 		},
 	},
 	{
@@ -42,6 +45,9 @@ export default defineConfig([
 			"@typescript-eslint/no-unsafe-return": "off",
 			"@typescript-eslint/no-unnecessary-type-assertion": "off",
 			"@typescript-eslint/require-await": "off",
+			// Popout-window rules don't apply under Bun (no `window`).
+			"obsidianmd/prefer-window-timers": "off",
+			"obsidianmd/no-global-this": "off",
 		},
 	},
 ]);

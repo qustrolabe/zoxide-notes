@@ -75,26 +75,26 @@ export class ZoxidianSearchModal extends SuggestModal<SortedEntry> {
 	}
 
 	renderSuggestion({ path, entry, frecency, matches, untracked }: SortedEntry, el: HTMLElement): void {
-		const row = el.createEl("div", { cls: "zoxidian-suggestion" });
+		const row = el.createDiv({ cls: "zoxidian-suggestion" });
 
-		const info = row.createEl("div", { cls: "zoxidian-suggestion-info" });
-		renderMatches(info.createEl("span", { cls: "suggestion-title" }), path, matches);
+		const info = row.createDiv({ cls: "zoxidian-suggestion-info" });
+		renderMatches(info.createSpan({ cls: "suggestion-title" }), path, matches);
 
-		const badges = row.createEl("div", { cls: "zoxidian-badges" });
+		const badges = row.createDiv({ cls: "zoxidian-badges" });
 		if (untracked) {
-			badges.createEl("span", {
+			badges.createSpan({
 				cls: "zoxidian-badge zoxidian-badge-untracked",
 				text: "Untracked",
 			});
 		} else {
 			if (this.plugin.settings.showFrecencyBadge) {
-				badges.createEl("span", {
+				badges.createSpan({
 					cls: "zoxidian-badge zoxidian-badge-frecency",
 					text: formatScore(frecency),
 				});
 			}
 			if (this.plugin.settings.showScoreBadge) {
-				badges.createEl("span", {
+				badges.createSpan({
 					cls: "zoxidian-badge zoxidian-badge-base",
 					text: formatScore(entry.score),
 				});
